@@ -1,5 +1,3 @@
-Yes — replace your `README.md` with this:
-
 ````md
 # KS Simple Swipe Card
 
