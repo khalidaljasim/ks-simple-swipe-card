@@ -1,14 +1,20 @@
 /*
   KS Simple Swipe Card
-  Lightweight Home Assistant Lovelace swipe card with enhanced editor UI.
+  Lightweight generic Home Assistant Lovelace swipe/slider card.
+  Includes a HACS-friendly visual editor for slide management.
 */
+
+const KS_SWIPE_CARD_VERSION = '0.3.0';
 
 class KSSimpleSwipeCard extends HTMLElement {
   static getStubConfig() {
     return {
       show_dots: true,
+      show_arrows: false,
       gap: '10px',
       height: 'auto',
+      slide_width: '100%',
+      dot_position: 'bottom',
       cards: [
         {
           type: 'entities',
@@ -30,10 +36,15 @@ class KSSimpleSwipeCard extends HTMLElement {
 
     this.config = {
       show_dots: config.show_dots !== false,
+      show_arrows: config.show_arrows === true,
       gap: config.gap || '10px',
       height: config.height || 'auto',
+      slide_width: config.slide_width || '100%',
+      dot_position: config.dot_position || 'bottom',
       cards: config.cards,
     };
+
+    this._rendered = false;
   }
 
   set hass(hass) {
@@ -50,6 +61,17 @@ class KSSimpleSwipeCard extends HTMLElement {
     }
   }
 
+  _currentIndex(scroller) {
+    return Math.round(scroller.scrollLeft / scroller.clientWidth);
+  }
+
+  _scrollTo(scroller, index) {
+    scroller.scrollTo({
+      left: index * scroller.clientWidth,
+      behavior: 'smooth',
+    });
+  }
+
   async render() {
     const helpers = await window.loadCardHelpers();
 
@@ -59,10 +81,15 @@ class KSSimpleSwipeCard extends HTMLElement {
     const style = document.createElement('style');
     style.textContent = `
       .ks-wrapper {
+        position: relative;
         background: transparent;
         box-shadow: none;
         border: none;
         overflow: hidden;
+      }
+
+      .ks-main {
+        position: relative;
       }
 
       .ks-scroller {
@@ -82,8 +109,8 @@ class KSSimpleSwipeCard extends HTMLElement {
       }
 
       .ks-slide {
-        flex: 0 0 100%;
-        min-width: 100%;
+        flex: 0 0 ${this.config.slide_width};
+        min-width: ${this.config.slide_width};
         scroll-snap-align: start;
         box-sizing: border-box;
       }
@@ -111,16 +138,61 @@ class KSSimpleSwipeCard extends HTMLElement {
         background: var(--primary-color);
         width: 18px;
       }
+
+      .ks-arrow {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        z-index: 3;
+        width: 36px;
+        height: 36px;
+        border-radius: 999px;
+        border: none;
+        background: rgba(var(--rgb-card-background-color), 0.82);
+        color: var(--primary-text-color);
+        box-shadow: var(--ha-card-box-shadow, 0 2px 8px rgba(0,0,0,0.18));
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+      }
+
+      .ks-arrow.prev {
+        left: 8px;
+      }
+
+      .ks-arrow.next {
+        right: 8px;
+      }
+
+      .ks-arrow[disabled] {
+        opacity: 0.35;
+        pointer-events: none;
+      }
     `;
 
     const wrapper = document.createElement('ha-card');
     wrapper.classList.add('ks-wrapper');
+
+    const main = document.createElement('div');
+    main.classList.add('ks-main');
 
     const scroller = document.createElement('div');
     scroller.classList.add('ks-scroller');
 
     const dots = document.createElement('div');
     dots.classList.add('ks-dots');
+
+    const prev = document.createElement('button');
+    prev.className = 'ks-arrow prev';
+    prev.type = 'button';
+    prev.textContent = '‹';
+
+    const next = document.createElement('button');
+    next.className = 'ks-arrow next';
+    next.type = 'button';
+    next.textContent = '›';
 
     this.config.cards.forEach((cardConfig, index) => {
       const slide = document.createElement('div');
@@ -136,31 +208,53 @@ class KSSimpleSwipeCard extends HTMLElement {
       if (this.config.show_dots) {
         const dot = document.createElement('button');
         dot.classList.add('ks-dot');
+        dot.type = 'button';
         if (index === 0) dot.classList.add('active');
-        dot.addEventListener('click', () => {
-          scroller.scrollTo({
-            left: index * scroller.clientWidth,
-            behavior: 'smooth',
-          });
-        });
+        dot.addEventListener('click', () => this._scrollTo(scroller, index));
         dots.appendChild(dot);
       }
     });
 
-    scroller.addEventListener('scroll', () => {
-      if (!this.config.show_dots) return;
-      const index = Math.round(scroller.scrollLeft / scroller.clientWidth);
-      dots.querySelectorAll('.ks-dot').forEach((dot, dotIndex) => {
-        dot.classList.toggle('active', dotIndex === index);
-      });
+    const updateControls = () => {
+      const index = this._currentIndex(scroller);
+
+      if (this.config.show_dots) {
+        dots.querySelectorAll('.ks-dot').forEach((dot, dotIndex) => {
+          dot.classList.toggle('active', dotIndex === index);
+        });
+      }
+
+      if (this.config.show_arrows) {
+        prev.disabled = index <= 0;
+        next.disabled = index >= this.config.cards.length - 1;
+      }
+    };
+
+    scroller.addEventListener('scroll', () => window.requestAnimationFrame(updateControls));
+
+    prev.addEventListener('click', () => {
+      this._scrollTo(scroller, Math.max(0, this._currentIndex(scroller) - 1));
     });
 
-    wrapper.appendChild(scroller);
-    if (this.config.show_dots) wrapper.appendChild(dots);
+    next.addEventListener('click', () => {
+      this._scrollTo(scroller, Math.min(this.config.cards.length - 1, this._currentIndex(scroller) + 1));
+    });
+
+    main.appendChild(scroller);
+
+    if (this.config.show_arrows && this.config.cards.length > 1) {
+      main.appendChild(prev);
+      main.appendChild(next);
+    }
+
+    if (this.config.show_dots && this.config.dot_position === 'top') wrapper.appendChild(dots);
+    wrapper.appendChild(main);
+    if (this.config.show_dots && this.config.dot_position !== 'top') wrapper.appendChild(dots);
 
     this.appendChild(style);
     this.appendChild(wrapper);
     this._rendered = true;
+    window.requestAnimationFrame(updateControls);
   }
 
   getCardSize() {
@@ -172,8 +266,11 @@ class KSSimpleSwipeCardEditor extends HTMLElement {
   setConfig(config) {
     this._config = {
       show_dots: true,
+      show_arrows: false,
       gap: '10px',
       height: 'auto',
+      slide_width: '100%',
+      dot_position: 'bottom',
       cards: [],
       ...config,
     };
@@ -208,10 +305,11 @@ class KSSimpleSwipeCardEditor extends HTMLElement {
     if (card.heading) return card.heading;
     if (card.name) return card.name;
     if (card.type === 'vertical-stack') {
-      const heading = (card.cards || []).find((c) => c.heading || c.title);
-      if (heading) return heading.heading || heading.title;
+      const heading = (card.cards || []).find((c) => c.heading || c.title || c.name);
+      if (heading) return heading.heading || heading.title || heading.name;
     }
     if (card.type === 'grid') return `Grid slide ${index + 1}`;
+    if (card.type === 'entities') return card.title || `Entities slide ${index + 1}`;
     return `Slide ${index + 1}`;
   }
 
@@ -229,86 +327,16 @@ class KSSimpleSwipeCardEditor extends HTMLElement {
           type: 'grid',
           columns: 2,
           square: false,
-          cards: [
-            {
-              type: 'entity',
-              entity: 'sensor.example',
-              name: 'Example sensor',
-            },
-          ],
+          cards: [],
         };
 
-      case 'room-sensors':
+      case 'markdown':
         return {
-          type: 'vertical-stack',
-          cards: [
-            {
-              type: 'heading',
-              heading: 'Room Sensors',
-              heading_style: 'subtitle',
-              icon: 'mdi:home-thermometer-outline',
-            },
-            {
-              type: 'heading',
-              heading: 'Device Name',
-              heading_style: 'section',
-              icon: 'mdi:air-filter',
-            },
-            {
-              type: 'grid',
-              columns: 2,
-              square: false,
-              cards: [
-                {
-                  type: 'custom:mushroom-entity-card',
-                  entity: 'sensor.example_temperature',
-                  name: 'Temperature',
-                  icon: 'mdi:thermometer',
-                  primary_info: 'state',
-                  secondary_info: 'name',
-                },
-                {
-                  type: 'custom:mushroom-entity-card',
-                  entity: 'sensor.example_humidity',
-                  name: 'Humidity',
-                  icon: 'mdi:water-percent',
-                  primary_info: 'state',
-                  secondary_info: 'name',
-                },
-              ],
-            },
-          ],
+          type: 'markdown',
+          content: '## New slide\nAdd your content here.',
         };
 
-      case 'lights':
-        return {
-          type: 'vertical-stack',
-          cards: [
-            {
-              type: 'heading',
-              heading: 'Lights',
-              heading_style: 'subtitle',
-              icon: 'mdi:lightbulb-group',
-            },
-            {
-              type: 'grid',
-              columns: 2,
-              square: false,
-              cards: [
-                {
-                  type: 'custom:mushroom-light-card',
-                  entity: 'light.example',
-                  name: 'Example Light',
-                  show_brightness_control: true,
-                  collapsible_controls: true,
-                  use_light_color: true,
-                },
-              ],
-            },
-          ],
-        };
-
-      default:
+      case 'vertical-stack':
         return {
           type: 'vertical-stack',
           cards: [
@@ -318,6 +346,12 @@ class KSSimpleSwipeCardEditor extends HTMLElement {
               heading_style: 'subtitle',
             },
           ],
+        };
+
+      default:
+        return {
+          type: 'vertical-stack',
+          cards: [],
         };
     }
   }
@@ -377,23 +411,49 @@ class KSSimpleSwipeCardEditor extends HTMLElement {
 
     section.innerHTML = `
       <div class="ks-section-title">Swipe Settings</div>
+
       <div class="ks-settings-grid">
         <label>
           <span>Gap between slides</span>
           <input class="ks-input" data-field="gap" value="${this._config.gap || '10px'}" placeholder="10px" />
         </label>
+
         <label>
           <span>Height</span>
           <input class="ks-input" data-field="height" value="${this._config.height || 'auto'}" placeholder="auto / 400px / 60vh" />
         </label>
+
+        <label>
+          <span>Slide width</span>
+          <input class="ks-input" data-field="slide_width" value="${this._config.slide_width || '100%'}" placeholder="100% / 80% / 320px" />
+        </label>
+
+        <label>
+          <span>Dot position</span>
+          <select class="ks-input" data-field="dot_position">
+            <option value="bottom" ${this._config.dot_position !== 'top' ? 'selected' : ''}>Bottom</option>
+            <option value="top" ${this._config.dot_position === 'top' ? 'selected' : ''}>Top</option>
+          </select>
+        </label>
       </div>
-      <label class="ks-toggle-row">
-        <span>
-          <strong>Show dots</strong>
-          <small>Display pagination dots under the swipe area.</small>
-        </span>
-        <input type="checkbox" data-field="show_dots" ${this._config.show_dots !== false ? 'checked' : ''} />
-      </label>
+
+      <div class="ks-toggle-grid">
+        <label class="ks-toggle-row">
+          <span>
+            <strong>Show dots</strong>
+            <small>Display pagination dots.</small>
+          </span>
+          <input type="checkbox" data-field="show_dots" ${this._config.show_dots !== false ? 'checked' : ''} />
+        </label>
+
+        <label class="ks-toggle-row">
+          <span>
+            <strong>Show arrows</strong>
+            <small>Display previous and next buttons.</small>
+          </span>
+          <input type="checkbox" data-field="show_arrows" ${this._config.show_arrows === true ? 'checked' : ''} />
+        </label>
+      </div>
     `;
 
     section.querySelector('[data-field="gap"]').addEventListener('change', (ev) => {
@@ -404,8 +464,20 @@ class KSSimpleSwipeCardEditor extends HTMLElement {
       this._updateRoot('height', ev.target.value || 'auto');
     });
 
+    section.querySelector('[data-field="slide_width"]').addEventListener('change', (ev) => {
+      this._updateRoot('slide_width', ev.target.value || '100%');
+    });
+
+    section.querySelector('[data-field="dot_position"]').addEventListener('change', (ev) => {
+      this._updateRoot('dot_position', ev.target.value || 'bottom');
+    });
+
     section.querySelector('[data-field="show_dots"]').addEventListener('change', (ev) => {
       this._updateRoot('show_dots', ev.target.checked);
+    });
+
+    section.querySelector('[data-field="show_arrows"]').addEventListener('change', (ev) => {
+      this._updateRoot('show_arrows', ev.target.checked);
     });
 
     return section;
@@ -419,14 +491,14 @@ class KSSimpleSwipeCardEditor extends HTMLElement {
       <div class="ks-section-title">Add Slide</div>
       <div class="ks-add-row">
         <select class="ks-input" data-template>
-          <option value="vertical-stack">Blank vertical stack</option>
-          <option value="entities">Entities card</option>
-          <option value="grid">Grid card</option>
-          <option value="room-sensors">Room sensors template</option>
-          <option value="lights">Lights template</option>
+          <option value="vertical-stack">Vertical stack</option>
+          <option value="grid">Grid</option>
+          <option value="entities">Entities</option>
+          <option value="markdown">Markdown</option>
         </select>
-        <button class="ks-button primary" data-add>Add slide</button>
+        <button class="ks-button primary" type="button" data-add>Add slide</button>
       </div>
+      <div class="ks-helper">Templates are generic so this card can be reused across any Home Assistant dashboard.</div>
     `;
 
     section.querySelector('[data-add]').addEventListener('click', () => {
@@ -452,8 +524,8 @@ class KSSimpleSwipeCardEditor extends HTMLElement {
           <small>${card.type || 'unknown card'}</small>
         </div>
         <div class="ks-actions">
-          <button type="button" data-action="up">↑</button>
-          <button type="button" data-action="down">↓</button>
+          <button type="button" data-action="up" title="Move up">↑</button>
+          <button type="button" data-action="down" title="Move down">↓</button>
           <button type="button" data-action="duplicate">Duplicate</button>
           <button type="button" class="danger" data-action="delete">Delete</button>
         </div>
@@ -551,6 +623,12 @@ class KSSimpleSwipeCardEditor extends HTMLElement {
         gap: 12px;
       }
 
+      .ks-toggle-grid {
+        display: grid;
+        gap: 10px;
+        margin-top: 14px;
+      }
+
       label {
         display: grid;
         gap: 6px;
@@ -571,15 +649,19 @@ class KSSimpleSwipeCardEditor extends HTMLElement {
       }
 
       .ks-toggle-row {
-        margin-top: 14px;
         display: flex;
         align-items: center;
         justify-content: space-between;
+        gap: 12px;
       }
 
-      .ks-toggle-row small {
+      .ks-toggle-row small,
+      .ks-helper {
         display: block;
         margin-top: 3px;
+        color: var(--secondary-text-color);
+        font-size: 12px;
+        line-height: 1.35;
       }
 
       .ks-add-row {
@@ -663,6 +745,18 @@ class KSSimpleSwipeCardEditor extends HTMLElement {
         color: var(--error-color);
         font-size: 12px;
       }
+
+      @media (max-width: 760px) {
+        .ks-settings-grid,
+        .ks-add-row {
+          grid-template-columns: 1fr;
+        }
+
+        .ks-slide-summary {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+      }
     `;
 
     const editor = document.createElement('div');
@@ -692,6 +786,6 @@ window.customCards = window.customCards || [];
 window.customCards.push({
   type: 'ks-simple-swipe-card',
   name: 'KS Simple Swipe Card',
-  description: 'Lightweight swipe/slider card with an enhanced editor UI.',
+  description: 'Lightweight generic swipe/slider card with an enhanced editor UI.',
   preview: true,
 });
