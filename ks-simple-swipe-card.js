@@ -4,7 +4,7 @@
   Self-contained HACS-friendly visual editor for slide management.
 */
 
-const KS_SWIPE_CARD_VERSION = '0.4.1';
+const KS_SWIPE_CARD_VERSION = '0.4.2';
 
 const KS_CARD_TYPES = [
   ['vertical-stack', 'Vertical stack'],
@@ -307,7 +307,17 @@ class KSSimpleSwipeCardEditor extends HTMLElement {
 
   set hass(hass) {
     this._hass = hass;
-    this.render();
+
+    if (!this._config) return;
+
+    if (!this._editorRendered) {
+      this.render();
+      return;
+    }
+
+    this.querySelectorAll('ha-entity-picker').forEach((picker) => {
+      picker.hass = hass;
+    });
   }
 
   _fireConfigChanged(config) {
@@ -1121,6 +1131,7 @@ class KSSimpleSwipeCardEditor extends HTMLElement {
 
     this.appendChild(style);
     this.appendChild(editor);
+    this._editorRendered = true;
   }
 }
 
