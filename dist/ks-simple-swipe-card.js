@@ -4,7 +4,7 @@
   Self-contained HACS-friendly visual editor for slide management.
 */
 
-const KS_SWIPE_CARD_VERSION = '0.4.0';
+const KS_SWIPE_CARD_VERSION = '0.4.1';
 
 const KS_CARD_TYPES = [
   ['vertical-stack', 'Vertical stack'],
@@ -290,6 +290,8 @@ class KSSimpleSwipeCard extends HTMLElement {
 
 class KSSimpleSwipeCardEditor extends HTMLElement {
   setConfig(config) {
+    this._openSlides = this._openSlides || new Set();
+    this._openNestedCards = this._openNestedCards || new Set();
     this._config = {
       show_dots: true,
       show_arrows: false,
@@ -781,7 +783,16 @@ class KSSimpleSwipeCardEditor extends HTMLElement {
 
   _renderNestedCard(parentIndex, child, childIndex) {
     const item = document.createElement('details');
+    const itemKey = `${parentIndex}:${childIndex}`;
     item.className = 'ks-nested-card';
+    item.open = this._openNestedCards.has(itemKey);
+    item.addEventListener('toggle', () => {
+      if (item.open) {
+        this._openNestedCards.add(itemKey);
+      } else {
+        this._openNestedCards.delete(itemKey);
+      }
+    });
     item.innerHTML = `
       <summary>
         <span>${childIndex + 1}. ${ksEscape(child.name || child.title || child.heading || child.type || 'Card')}</span>
@@ -828,7 +839,14 @@ class KSSimpleSwipeCardEditor extends HTMLElement {
   _renderSlide(card, index) {
     const wrap = document.createElement('details');
     wrap.className = 'ks-slide-editor';
-    if (index === 0) wrap.open = true;
+    wrap.open = this._openSlides.size ? this._openSlides.has(index) : index === 0;
+    wrap.addEventListener('toggle', () => {
+      if (wrap.open) {
+        this._openSlides.add(index);
+      } else {
+        this._openSlides.delete(index);
+      }
+    });
 
     const title = this._getSlideTitle(card, index);
 
