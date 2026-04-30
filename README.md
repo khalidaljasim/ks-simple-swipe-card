@@ -121,8 +121,6 @@ After installing an update through HACS:
 
 ```text
 .
-├── dist/
-│   └── ks-simple-swipe-card.js
 ├── ks-simple-swipe-card.js
 ├── hacs.json
 └── README.md
