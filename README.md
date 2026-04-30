@@ -42,12 +42,12 @@ Existing unsupported card types are preserved in the configuration, but only the
 HACS resource path:
 
 ```text
-/hacsfiles/ks-simple-swipe-card/dist/ks-simple-swipe-card.js
+/hacsfiles/ks-simple-swipe-card/ks-simple-swipe-card.js
 ```
 
 ### Manual
 
-1. Copy `dist/ks-simple-swipe-card.js` into your Home Assistant `www` directory.
+1. Copy `ks-simple-swipe-card.js` into your Home Assistant `www` directory.
 2. Add the file as a dashboard resource.
 
 Example manual resource path:
@@ -123,6 +123,7 @@ After installing an update through HACS:
 .
 ├── dist/
 │   └── ks-simple-swipe-card.js
+├── ks-simple-swipe-card.js
 ├── hacs.json
 └── README.md
 ```
