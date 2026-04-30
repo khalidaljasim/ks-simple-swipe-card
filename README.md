@@ -1,71 +1,132 @@
-````md
 # KS Simple Swipe Card
 
-A lightweight swipe / slider card for Home Assistant Lovelace, built with native scroll-snap and a simple visual editor.
+`KS Simple Swipe Card` is a lightweight Home Assistant Lovelace card for creating swipeable dashboard sections. It is designed for simple, reusable slider layouts and includes a self-contained visual editor for managing slides without editing raw JSON for common card types.
 
 ## Features
 
-- Lightweight swipe layout
-- Works with any Lovelace card inside each slide
-- Pagination dots
-- Configurable slide gap
-- Configurable height
-- Basic visual editor
-- HACS compatible
+- Swipeable Lovelace card carousel
+- Native horizontal scrolling with scroll snap
+- Optional pagination dots
+- Optional previous and next arrows
+- Configurable slide gap, width, height, and dot position
+- Built-in visual editor for common slide/card types
+- HACS-compatible dashboard resource
+- No build step or external runtime dependencies
+
+## Supported Editor Types
+
+The built-in editor supports common Home Assistant card configurations:
+
+- Vertical stack
+- Grid
+- Entities
+- Markdown
+- Heading
+- Tile
+- Button
+- Entity
+
+Existing unsupported card types are preserved in the configuration, but only the supported types above can be edited visually.
 
 ## Installation
 
 ### HACS
 
-1. Open HACS
-2. Go to **Custom repositories**
-3. Add this repository
-4. Category: **Dashboard**
-5. Install **KS Simple Swipe Card**
-6. Refresh Home Assistant
+1. Open HACS in Home Assistant.
+2. Go to **Custom repositories**.
+3. Add this repository URL.
+4. Select **Dashboard** as the repository category.
+5. Install **KS Simple Swipe Card**.
+6. Refresh your browser cache after installation.
 
-Resource path:
+HACS resource path:
 
 ```text
 /hacsfiles/ks-simple-swipe-card/dist/ks-simple-swipe-card.js
-````
+```
 
-## Example
+### Manual
+
+1. Copy `dist/ks-simple-swipe-card.js` into your Home Assistant `www` directory.
+2. Add the file as a dashboard resource.
+
+Example manual resource path:
+
+```text
+/local/ks-simple-swipe-card.js
+```
+
+Resource type:
+
+```text
+JavaScript module
+```
+
+## Basic Example
 
 ```yaml
 type: custom:ks-simple-swipe-card
 show_dots: true
+show_arrows: false
 gap: 10px
 height: auto
+slide_width: 100%
+dot_position: bottom
 cards:
   - type: entities
-    title: Living Room
+    title: Lights
     entities:
-      - sensor.living_ikea_aqs_temperature
-
-  - type: entities
-    title: Shed
-    entities:
-      - sensor.shed_ikea_aqs_temperature
+      - light.living_room
+      - light.kitchen
+  - type: markdown
+    content: |
+      ## Welcome
+      This is a swipeable dashboard slide.
 ```
 
 ## Options
 
-| Option      | Type    | Default  | Description                                     |
-| ----------- | ------- | -------- | ----------------------------------------------- |
-| `cards`     | list    | required | List of Lovelace cards shown as swipe slides    |
-| `show_dots` | boolean | `true`   | Show pagination dots                            |
-| `gap`       | string  | `12px`   | Space between slides                            |
-| `height`    | string  | `auto`   | Card height, such as `auto`, `400px`, or `60vh` |
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `cards` | list | required | Lovelace cards shown as slides. |
+| `show_dots` | boolean | `true` | Shows pagination dots below or above the slider. |
+| `show_arrows` | boolean | `false` | Shows previous and next arrow buttons. |
+| `gap` | string | `10px` | Space between slides. |
+| `height` | string | `auto` | Slider height, such as `auto`, `400px`, or `60vh`. |
+| `slide_width` | string | `100%` | Width of each slide, such as `100%`, `80%`, or `320px`. |
+| `dot_position` | string | `bottom` | Dot position. Use `bottom` or `top`. |
 
-## Notes
+## Editor
 
-This card is designed to be simple, clean, and fast.
-It uses native browser scrolling instead of a heavy carousel library.
+The card includes its own Lovelace visual editor. You can:
 
-## Credits
+- Add new slides from templates
+- Change slide type from a dropdown
+- Edit common fields such as title, heading, markdown content, entity, icon, and grid columns
+- Add and remove entities
+- Add cards inside vertical stack and grid slides
+- Move, duplicate, and delete slides
 
-Created for Home Assistant dashboards that need clean swipe sections without unnecessary complexity.
+The editor is intentionally self-contained and does not rely on Home Assistant internal card editor elements.
 
+## Updating
+
+After installing an update through HACS:
+
+1. Refresh Home Assistant.
+2. Clear the browser cache or hard refresh the page.
+3. Reload dashboard resources if Home Assistant still shows the old version.
+
+## Repository Structure
+
+```text
+.
+├── dist/
+│   └── ks-simple-swipe-card.js
+├── hacs.json
+└── README.md
 ```
-```
+
+## License
+
+Add your preferred license before publishing the repository publicly.

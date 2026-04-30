@@ -1,5 +1,5 @@
 {
   "name": "KS Simple Swipe Card",
-  "render_readme": true,
-  "filename": "ks-simple-swipe-card.js"
+  "filename": "dist/ks-simple-swipe-card.js",
+  "render_readme": true
 }
