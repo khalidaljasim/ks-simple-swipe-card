@@ -4,7 +4,7 @@
   Self-contained HACS-friendly visual editor for slide management.
 */
 
-const KS_SWIPE_CARD_VERSION = '0.4.2';
+const KS_SWIPE_CARD_VERSION = '0.4.3';
 
 const KS_CARD_TYPES = [
   ['vertical-stack', 'Vertical stack'],
@@ -315,9 +315,7 @@ class KSSimpleSwipeCardEditor extends HTMLElement {
       return;
     }
 
-    this.querySelectorAll('ha-entity-picker').forEach((picker) => {
-      picker.hass = hass;
-    });
+    this._hass = hass;
   }
 
   _fireConfigChanged(config) {
@@ -550,22 +548,30 @@ class KSSimpleSwipeCardEditor extends HTMLElement {
     return field;
   }
 
-  _renderEntityPicker(value, onChange) {
-    if (customElements.get('ha-entity-picker')) {
-      const picker = document.createElement('ha-entity-picker');
-      picker.hass = this._hass;
-      picker.value = value || '';
-      picker.allowCustomEntity = true;
-      picker.addEventListener('value-changed', (ev) => onChange(ev.detail.value || ''));
-      return picker;
-    }
+  _entityOptions(currentValue) {
+    const states = this._hass?.states || {};
+    const entityIds = Object.keys(states).sort((a, b) => a.localeCompare(b));
+    const options = currentValue && !entityIds.includes(currentValue) ? [currentValue, ...entityIds] : entityIds;
 
-    const input = document.createElement('input');
-    input.className = 'ks-input';
-    input.value = value || '';
-    input.placeholder = 'light.kitchen';
-    input.addEventListener('change', (ev) => onChange(ev.target.value));
-    return input;
+    return [
+      '<option value="">Select entity</option>',
+      ...options.map((entityId) => {
+        const state = states[entityId];
+        const friendlyName = state?.attributes?.friendly_name;
+        const label = friendlyName ? `${friendlyName} (${entityId})` : entityId;
+        return `<option value="${ksEscape(entityId)}" ${entityId === currentValue ? 'selected' : ''}>${ksEscape(label)}</option>`;
+      }),
+    ].join('');
+  }
+
+  _renderEntityPicker(value, onChange) {
+    const select = document.createElement('select');
+    select.className = 'ks-input ks-entity-select';
+    select.innerHTML = this._entityOptions(value || '');
+    select.addEventListener('pointerdown', (ev) => ev.stopPropagation());
+    select.addEventListener('click', (ev) => ev.stopPropagation());
+    select.addEventListener('change', (ev) => onChange(ev.target.value));
+    return select;
   }
 
   _renderEntityField(label, value, onChange) {
@@ -984,7 +990,7 @@ class KSSimpleSwipeCardEditor extends HTMLElement {
         color: var(--primary-text-color);
       }
 
-      ha-entity-picker {
+      .ks-entity-select {
         width: 100%;
       }
 
