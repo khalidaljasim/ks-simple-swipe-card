@@ -4,7 +4,7 @@
   Self-contained HACS-friendly visual editor for slide management.
 */
 
-const KS_SWIPE_CARD_VERSION = '0.4.6';
+const KS_SWIPE_CARD_VERSION = '0.4.7';
 
 const KS_CARD_TYPES = [
   ['vertical-stack', 'Vertical stack'],
@@ -1103,6 +1103,7 @@ class KSSimpleSwipeCardEditor extends HTMLElement {
       .ks-editor {
         display: grid;
         gap: 14px;
+        max-width: 100%;
       }
 
       .ks-editor-section,
@@ -1129,8 +1130,15 @@ class KSSimpleSwipeCardEditor extends HTMLElement {
       .ks-settings-grid,
       .ks-card-fields {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
         gap: 12px;
+      }
+
+      .ks-card-fields > *,
+      .ks-settings-grid > *,
+      .ks-add-row > *,
+      .ks-entity-row > * {
+        min-width: 0;
       }
 
       .ks-toggle-grid {
@@ -1150,12 +1158,15 @@ class KSSimpleSwipeCardEditor extends HTMLElement {
       .ks-textarea,
       select {
         width: 100%;
+        min-height: 42px;
         box-sizing: border-box;
         border: 1px solid var(--divider-color);
         border-radius: 8px;
         padding: 10px;
         background: var(--secondary-background-color);
         color: var(--primary-text-color);
+        font: inherit;
+        line-height: 1.35;
       }
 
       .ks-entity-select {
@@ -1186,7 +1197,7 @@ class KSSimpleSwipeCardEditor extends HTMLElement {
 
       .ks-add-row {
         display: grid;
-        grid-template-columns: 1fr auto;
+        grid-template-columns: minmax(0, 1fr) auto;
         gap: 10px;
       }
 
@@ -1205,6 +1216,13 @@ class KSSimpleSwipeCardEditor extends HTMLElement {
         align-items: center;
         justify-content: space-between;
         gap: 12px;
+        min-width: 0;
+      }
+
+      .ks-slide-summary > div,
+      .ks-nested-card summary > span:first-child {
+        min-width: 0;
+        overflow-wrap: anywhere;
       }
 
       .ks-slide-summary small {
@@ -1224,11 +1242,14 @@ class KSSimpleSwipeCardEditor extends HTMLElement {
       .ks-button {
         border: none;
         border-radius: 8px;
+        min-height: 40px;
         padding: 8px 10px;
         background: var(--secondary-background-color);
         color: var(--primary-text-color);
         cursor: pointer;
         font: inherit;
+        touch-action: manipulation;
+        white-space: nowrap;
       }
 
       button.primary,
@@ -1256,7 +1277,7 @@ class KSSimpleSwipeCardEditor extends HTMLElement {
 
       .ks-entity-row {
         display: grid;
-        grid-template-columns: 1fr auto;
+        grid-template-columns: minmax(0, 1fr) auto;
         gap: 8px;
         align-items: center;
         margin-bottom: 8px;
@@ -1289,6 +1310,33 @@ class KSSimpleSwipeCardEditor extends HTMLElement {
         .ks-nested-card summary {
           align-items: flex-start;
           flex-direction: column;
+        }
+
+        .ks-actions {
+          justify-content: flex-start;
+        }
+      }
+
+      @media (max-width: 480px), (pointer: coarse) {
+        .ks-editor-section,
+        .ks-slide-editor {
+          padding: 12px;
+        }
+
+        .ks-input,
+        .ks-textarea,
+        select {
+          min-height: 44px;
+          font-size: 16px;
+        }
+
+        button,
+        .ks-button {
+          min-height: 44px;
+        }
+
+        .ks-textarea {
+          min-height: 180px;
         }
       }
     `;
