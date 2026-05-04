@@ -4,7 +4,7 @@
   Self-contained HACS-friendly visual editor for slide management.
 */
 
-const KS_SWIPE_CARD_VERSION = '0.4.5';
+const KS_SWIPE_CARD_VERSION = '0.4.6';
 
 const KS_CARD_TYPES = [
   ['vertical-stack', 'Vertical stack'],
@@ -17,6 +17,8 @@ const KS_CARD_TYPES = [
 
 const KS_SIMPLE_CARD_TYPES = [
   ['custom:mushroom-template-card', 'Mushroom template'],
+  ['custom:mushroom-light-card', 'Mushroom light'],
+  ['custom:mushroom-entity-card', 'Mushroom entity'],
   ['tile', 'Tile'],
   ['button', 'Button'],
   ['entity', 'Entity'],
@@ -368,6 +370,22 @@ class KSSimpleSwipeCardEditor extends HTMLElement {
           secondary: '',
           icon: 'mdi:lightbulb',
           entity: '',
+        };
+      case 'custom:mushroom-light-card':
+        return {
+          type: 'custom:mushroom-light-card',
+          name: 'New light',
+          entity: '',
+          icon: 'mdi:lightbulb',
+          show_brightness_control: true,
+          use_light_color: true,
+        };
+      case 'custom:mushroom-entity-card':
+        return {
+          type: 'custom:mushroom-entity-card',
+          name: 'New entity',
+          entity: '',
+          icon: '',
         };
       case 'entities':
         return { type: 'entities', title: 'New entities slide', entities: [] };
@@ -770,9 +788,53 @@ class KSSimpleSwipeCardEditor extends HTMLElement {
 
     if (card.type === 'custom:mushroom-template-card') {
       fields.appendChild(this._renderEntityField('Entity', card.entity, (entity) => update({ entity })));
-      fields.appendChild(this._field('Primary text', card.primary || '', (primary) => update({ primary }), 'Main label'));
-      fields.appendChild(this._field('Secondary text', card.secondary || '', (secondary) => update({ secondary }), 'Sub label'));
+      fields.appendChild(this._textarea('Primary text', card.primary || '', (primary) => update({ primary }), 'Main label'));
+      fields.appendChild(this._textarea('Secondary text', card.secondary || '', (secondary) => update({ secondary }), 'Sub label'));
       fields.appendChild(this._field('Icon', card.icon || '', (icon) => update({ icon }), 'mdi:lightbulb'));
+      fields.appendChild(this._field('Icon color', card.icon_color || '', (icon_color) => update({ icon_color }), 'blue / amber / var(...)'));
+      fields.appendChild(
+        this._select(
+          'Layout',
+          [
+            ['', 'Default'],
+            ['horizontal', 'Horizontal'],
+            ['vertical', 'Vertical'],
+          ],
+          card.layout || '',
+          (layout) => update({ layout })
+        )
+      );
+      return fields;
+    }
+
+    if (card.type === 'custom:mushroom-light-card') {
+      fields.appendChild(this._renderEntityField('Entity', card.entity, (entity) => update({ entity })));
+      fields.appendChild(this._field('Name', card.name || '', (name) => update({ name }), 'Optional label'));
+      fields.appendChild(this._field('Icon', card.icon || '', (icon) => update({ icon }), 'mdi:lightbulb'));
+      fields.appendChild(this._field('Icon color', card.icon_color || '', (icon_color) => update({ icon_color }), 'amber / blue / var(...)'));
+      fields.appendChild(
+        this._select(
+          'Layout',
+          [
+            ['', 'Default'],
+            ['horizontal', 'Horizontal'],
+            ['vertical', 'Vertical'],
+          ],
+          card.layout || '',
+          (layout) => update({ layout })
+        )
+      );
+      fields.appendChild(this._checkbox('Brightness control', card.show_brightness_control === true, (show_brightness_control) => update({ show_brightness_control })));
+      fields.appendChild(this._checkbox('Color temperature control', card.show_color_temp_control === true, (show_color_temp_control) => update({ show_color_temp_control })));
+      fields.appendChild(this._checkbox('Color control', card.show_color_control === true, (show_color_control) => update({ show_color_control })));
+      fields.appendChild(this._checkbox('Use light color', card.use_light_color === true, (use_light_color) => update({ use_light_color })));
+      return fields;
+    }
+
+    if (card.type === 'custom:mushroom-entity-card') {
+      fields.appendChild(this._renderEntityField('Entity', card.entity, (entity) => update({ entity })));
+      fields.appendChild(this._field('Name', card.name || '', (name) => update({ name }), 'Optional label'));
+      fields.appendChild(this._field('Icon', card.icon || '', (icon) => update({ icon }), 'mdi:information'));
       fields.appendChild(this._field('Icon color', card.icon_color || '', (icon_color) => update({ icon_color }), 'blue / amber / var(...)'));
       fields.appendChild(
         this._select(

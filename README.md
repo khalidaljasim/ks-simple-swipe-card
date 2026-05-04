@@ -27,6 +27,8 @@ The built-in editor supports common Home Assistant card configurations:
 - Button
 - Entity
 - Mushroom template card (`custom:mushroom-template-card`)
+- Mushroom light card (`custom:mushroom-light-card`)
+- Mushroom entity card (`custom:mushroom-entity-card`)
 
 Existing unsupported card types are preserved in the configuration, but only the supported types above can be edited visually.
 
