@@ -4,10 +4,11 @@
   Self-contained HACS-friendly visual editor for slide management.
 */
 
-const KS_SWIPE_CARD_VERSION = '0.4.3';
+const KS_SWIPE_CARD_VERSION = '0.4.4';
 
 const KS_CARD_TYPES = [
   ['vertical-stack', 'Vertical stack'],
+  ['custom:vertical-stack-in-card', 'Vertical stack in card'],
   ['grid', 'Grid'],
   ['entities', 'Entities'],
   ['markdown', 'Markdown'],
@@ -341,7 +342,7 @@ class KSSimpleSwipeCardEditor extends HTMLElement {
     if (card.title) return card.title;
     if (card.heading) return card.heading;
     if (card.name) return card.name;
-    if (card.type === 'vertical-stack') {
+    if (Array.isArray(card.cards)) {
       const heading = (card.cards || []).find((c) => c.heading || c.title || c.name);
       if (heading) return heading.heading || heading.title || heading.name;
     }
@@ -366,6 +367,11 @@ class KSSimpleSwipeCardEditor extends HTMLElement {
         return { type: 'markdown', content: '## New slide\nAdd your content here.' };
       case 'heading':
         return { type: 'heading', heading: 'New Slide', heading_style: 'subtitle' };
+      case 'custom:vertical-stack-in-card':
+        return {
+          type: 'custom:vertical-stack-in-card',
+          cards: [{ type: 'heading', heading: 'New Slide', heading_style: 'subtitle' }],
+        };
       case 'vertical-stack':
       default:
         return {
@@ -501,7 +507,11 @@ class KSSimpleSwipeCardEditor extends HTMLElement {
   }
 
   _renderOptions(options, current) {
-    return options
+    const optionList = options.some(([value]) => value === current)
+      ? options
+      : [[current, current || 'Unknown'], ...options];
+
+    return optionList
       .map(([value, label]) => `<option value="${value}" ${value === current ? 'selected' : ''}>${label}</option>`)
       .join('');
   }
@@ -726,7 +736,7 @@ class KSSimpleSwipeCardEditor extends HTMLElement {
       return fields;
     }
 
-    if (card.type === 'vertical-stack' && path.childIndex === undefined) {
+    if (Array.isArray(card.cards) && path.childIndex === undefined) {
       fields.appendChild(this._renderNestedCards(path.index, card, 'Stack cards'));
       return fields;
     }
@@ -813,6 +823,7 @@ class KSSimpleSwipeCardEditor extends HTMLElement {
       <summary>
         <span>${childIndex + 1}. ${ksEscape(child.name || child.title || child.heading || child.type || 'Card')}</span>
         <span class="ks-actions">
+          <button type="button" data-action="edit">Edit</button>
           <button type="button" data-action="up">Up</button>
           <button type="button" data-action="down">Down</button>
           <button type="button" class="danger" data-action="delete">Delete</button>
@@ -823,6 +834,10 @@ class KSSimpleSwipeCardEditor extends HTMLElement {
     item.querySelector('[data-action="up"]').addEventListener('click', (ev) => {
       ev.preventDefault();
       this._moveNested(parentIndex, childIndex, -1);
+    });
+    item.querySelector('[data-action="edit"]').addEventListener('click', (ev) => {
+      ev.preventDefault();
+      item.open = !item.open;
     });
     item.querySelector('[data-action="down"]').addEventListener('click', (ev) => {
       ev.preventDefault();

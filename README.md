@@ -18,6 +18,7 @@
 The built-in editor supports common Home Assistant card configurations:
 
 - Vertical stack
+- Vertical stack in card (`custom:vertical-stack-in-card`)
 - Grid
 - Entities
 - Markdown
