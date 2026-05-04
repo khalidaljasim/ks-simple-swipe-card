@@ -4,7 +4,7 @@
   Self-contained HACS-friendly visual editor for slide management.
 */
 
-const KS_SWIPE_CARD_VERSION = '0.4.4';
+const KS_SWIPE_CARD_VERSION = '0.4.5';
 
 const KS_CARD_TYPES = [
   ['vertical-stack', 'Vertical stack'],
@@ -16,12 +16,14 @@ const KS_CARD_TYPES = [
 ];
 
 const KS_SIMPLE_CARD_TYPES = [
+  ['custom:mushroom-template-card', 'Mushroom template'],
   ['tile', 'Tile'],
   ['button', 'Button'],
   ['entity', 'Entity'],
   ['entities', 'Entities'],
   ['markdown', 'Markdown'],
   ['heading', 'Heading'],
+  ['grid', 'Grid'],
 ];
 
 const ksClone = (value) => JSON.parse(JSON.stringify(value));
@@ -359,6 +361,14 @@ class KSSimpleSwipeCardEditor extends HTMLElement {
         return { type: 'tile', name: 'New tile', entity: '' };
       case 'entity':
         return { type: 'entity', name: 'New entity', entity: '' };
+      case 'custom:mushroom-template-card':
+        return {
+          type: 'custom:mushroom-template-card',
+          primary: 'New card',
+          secondary: '',
+          icon: 'mdi:lightbulb',
+          entity: '',
+        };
       case 'entities':
         return { type: 'entities', title: 'New entities slide', entities: [] };
       case 'grid':
@@ -424,6 +434,42 @@ class KSSimpleSwipeCardEditor extends HTMLElement {
     this._replaceSlide(index, this._template(type));
   }
 
+  _pathParts(path) {
+    return [path.index, ...(path.children || []), ...(path.childIndex === undefined ? [] : [path.childIndex])];
+  }
+
+  _getCardAtPath(path) {
+    const [rootIndex, ...children] = this._pathParts(path);
+    let card = this._config.cards[rootIndex];
+    children.forEach((childIndex) => {
+      card = card?.cards?.[childIndex];
+    });
+    return card;
+  }
+
+  _replaceCardAtPath(path, updatedCard) {
+    const cards = ksClone(this._config.cards || []);
+    const [rootIndex, ...children] = this._pathParts(path);
+
+    if (!children.length) {
+      cards[rootIndex] = updatedCard;
+    } else {
+      let parent = cards[rootIndex];
+      children.slice(0, -1).forEach((childIndex) => {
+        parent.cards = [...(parent.cards || [])];
+        parent = parent.cards[childIndex];
+      });
+      parent.cards = [...(parent.cards || [])];
+      parent.cards[children[children.length - 1]] = updatedCard;
+    }
+
+    this._fireConfigChanged({ ...this._config, cards });
+  }
+
+  _updateCardAtPath(path, patch) {
+    this._replaceCardAtPath(path, { ...this._getCardAtPath(path), ...patch });
+  }
+
   _updateNested(parentIndex, childIndex, patch) {
     const cards = [...(this._config.cards || [])];
     const parent = { ...cards[parentIndex], cards: [...(cards[parentIndex].cards || [])] };
@@ -467,6 +513,31 @@ class KSSimpleSwipeCardEditor extends HTMLElement {
     this._fireConfigChanged({ ...this._config, cards });
   }
 
+  _addNestedAtPath(parentPath, type) {
+    const parent = this._getCardAtPath(parentPath);
+    this._replaceCardAtPath(parentPath, {
+      ...parent,
+      cards: [...(parent.cards || []), this._template(type)],
+    });
+  }
+
+  _deleteNestedAtPath(parentPath, childIndex) {
+    const parent = this._getCardAtPath(parentPath);
+    const cards = [...(parent.cards || [])];
+    cards.splice(childIndex, 1);
+    this._replaceCardAtPath(parentPath, { ...parent, cards });
+  }
+
+  _moveNestedAtPath(parentPath, childIndex, direction) {
+    const parent = this._getCardAtPath(parentPath);
+    const cards = [...(parent.cards || [])];
+    const newIndex = childIndex + direction;
+    if (newIndex < 0 || newIndex >= cards.length) return;
+    const [item] = cards.splice(childIndex, 1);
+    cards.splice(newIndex, 0, item);
+    this._replaceCardAtPath(parentPath, { ...parent, cards });
+  }
+
   _entities(card) {
     return Array.isArray(card.entities) ? card.entities : [];
   }
@@ -497,13 +568,8 @@ class KSSimpleSwipeCardEditor extends HTMLElement {
   }
 
   _entityListOwner(path) {
-    if (path.childIndex === undefined) {
-      const card = this._config.cards[path.index];
-      return { card, update: (updated) => this._replaceSlide(path.index, updated) };
-    }
-
-    const card = this._config.cards[path.index].cards[path.childIndex];
-    return { card, update: (updated) => this._replaceNested(path.index, path.childIndex, updated) };
+    const card = this._getCardAtPath(path);
+    return { card, update: (updated) => this._replaceCardAtPath(path, updated) };
   }
 
   _renderOptions(options, current) {
@@ -702,6 +768,27 @@ class KSSimpleSwipeCardEditor extends HTMLElement {
       return fields;
     }
 
+    if (card.type === 'custom:mushroom-template-card') {
+      fields.appendChild(this._renderEntityField('Entity', card.entity, (entity) => update({ entity })));
+      fields.appendChild(this._field('Primary text', card.primary || '', (primary) => update({ primary }), 'Main label'));
+      fields.appendChild(this._field('Secondary text', card.secondary || '', (secondary) => update({ secondary }), 'Sub label'));
+      fields.appendChild(this._field('Icon', card.icon || '', (icon) => update({ icon }), 'mdi:lightbulb'));
+      fields.appendChild(this._field('Icon color', card.icon_color || '', (icon_color) => update({ icon_color }), 'blue / amber / var(...)'));
+      fields.appendChild(
+        this._select(
+          'Layout',
+          [
+            ['', 'Default'],
+            ['horizontal', 'Horizontal'],
+            ['vertical', 'Vertical'],
+          ],
+          card.layout || '',
+          (layout) => update({ layout })
+        )
+      );
+      return fields;
+    }
+
     if (card.type === 'heading') {
       fields.appendChild(this._field('Heading', card.heading || '', (heading) => update({ heading }), 'Heading text'));
       fields.appendChild(
@@ -729,15 +816,15 @@ class KSSimpleSwipeCardEditor extends HTMLElement {
       return fields;
     }
 
-    if (card.type === 'grid' && path.childIndex === undefined) {
+    if (card.type === 'grid') {
       fields.appendChild(this._field('Columns', card.columns ?? 2, (columns) => update({ columns: Number(columns) || 1 }), '2'));
       fields.appendChild(this._checkbox('Square cards', card.square === true, (square) => update({ square })));
-      fields.appendChild(this._renderNestedCards(path.index, card, 'Grid cards'));
+      fields.appendChild(this._renderNestedCards(path, card, 'Grid cards'));
       return fields;
     }
 
-    if (Array.isArray(card.cards) && path.childIndex === undefined) {
-      fields.appendChild(this._renderNestedCards(path.index, card, 'Stack cards'));
+    if (Array.isArray(card.cards)) {
+      fields.appendChild(this._renderNestedCards(path, card, 'Stack cards'));
       return fields;
     }
 
@@ -782,13 +869,13 @@ class KSSimpleSwipeCardEditor extends HTMLElement {
     return wrap;
   }
 
-  _renderNestedCards(parentIndex, card, title) {
+  _renderNestedCards(parentPath, card, title) {
     const wrap = document.createElement('div');
     wrap.className = 'ks-wide ks-nested';
     wrap.innerHTML = `<div class="ks-subtitle">${title}</div>`;
 
     (card.cards || []).forEach((child, childIndex) => {
-      wrap.appendChild(this._renderNestedCard(parentIndex, child, childIndex));
+      wrap.appendChild(this._renderNestedCard(parentPath, child, childIndex));
     });
 
     const addRow = document.createElement('div');
@@ -800,16 +887,20 @@ class KSSimpleSwipeCardEditor extends HTMLElement {
       <button class="ks-button" type="button" data-add>Add card</button>
     `;
     addRow.querySelector('[data-add]').addEventListener('click', () => {
-      this._addNested(parentIndex, addRow.querySelector('[data-template]').value);
+      this._addNestedAtPath(parentPath, addRow.querySelector('[data-template]').value);
     });
 
     wrap.appendChild(addRow);
     return wrap;
   }
 
-  _renderNestedCard(parentIndex, child, childIndex) {
+  _renderNestedCard(parentPath, child, childIndex) {
     const item = document.createElement('details');
-    const itemKey = `${parentIndex}:${childIndex}`;
+    const childPath = {
+      index: parentPath.index,
+      children: [...(parentPath.children || []), childIndex],
+    };
+    const itemKey = this._pathParts(childPath).join(':');
     item.className = 'ks-nested-card';
     item.open = this._openNestedCards.has(itemKey);
     item.addEventListener('toggle', () => {
@@ -833,7 +924,7 @@ class KSSimpleSwipeCardEditor extends HTMLElement {
 
     item.querySelector('[data-action="up"]').addEventListener('click', (ev) => {
       ev.preventDefault();
-      this._moveNested(parentIndex, childIndex, -1);
+      this._moveNestedAtPath(parentPath, childIndex, -1);
     });
     item.querySelector('[data-action="edit"]').addEventListener('click', (ev) => {
       ev.preventDefault();
@@ -841,25 +932,25 @@ class KSSimpleSwipeCardEditor extends HTMLElement {
     });
     item.querySelector('[data-action="down"]').addEventListener('click', (ev) => {
       ev.preventDefault();
-      this._moveNested(parentIndex, childIndex, 1);
+      this._moveNestedAtPath(parentPath, childIndex, 1);
     });
     item.querySelector('[data-action="delete"]').addEventListener('click', (ev) => {
       ev.preventDefault();
-      this._deleteNested(parentIndex, childIndex);
+      this._deleteNestedAtPath(parentPath, childIndex);
     });
 
     const body = document.createElement('div');
     body.className = 'ks-nested-body';
     body.appendChild(
       this._select('Card type', KS_SIMPLE_CARD_TYPES, child.type, (type) => {
-        this._replaceNested(parentIndex, childIndex, this._template(type));
+        this._replaceCardAtPath(childPath, this._template(type));
       })
     );
     body.appendChild(
       this._renderCommonEditor(
         child,
-        (patch) => this._updateNested(parentIndex, childIndex, patch),
-        { index: parentIndex, childIndex }
+        (patch) => this._updateCardAtPath(childPath, patch),
+        childPath
       )
     );
 
