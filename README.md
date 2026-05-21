@@ -9,6 +9,7 @@
 - Optional pagination dots
 - Optional previous and next arrows
 - Configurable slide gap, width, height, and dot position
+- Gesture handling that lets nested sliders and draggable controls receive touch/pointer events
 - Built-in visual editor for common slide/card types
 - HACS-compatible dashboard resource
 - No build step or external runtime dependencies

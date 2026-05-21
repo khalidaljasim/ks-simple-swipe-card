@@ -4,7 +4,7 @@
   Self-contained HACS-friendly visual editor for slide management.
 */
 
-const KS_SWIPE_CARD_VERSION = '0.4.7';
+const KS_SWIPE_CARD_VERSION = '0.4.8';
 
 const KS_CARD_TYPES = [
   ['vertical-stack', 'Vertical stack'],
@@ -92,6 +92,13 @@ class KSSimpleSwipeCard extends HTMLElement {
     }
   }
 
+  disconnectedCallback() {
+    if (this._globalSwipeUnlock) {
+      window.removeEventListener('mouseup', this._globalSwipeUnlock);
+      this._globalSwipeUnlock = undefined;
+    }
+  }
+
   _currentIndex(scroller) {
     return Math.round(scroller.scrollLeft / scroller.clientWidth);
   }
@@ -101,6 +108,55 @@ class KSSimpleSwipeCard extends HTMLElement {
       left: index * scroller.clientWidth,
       behavior: 'smooth',
     });
+  }
+
+  _isInteractiveSwipeTarget(ev) {
+    const interactiveSelector = [
+      'a',
+      'button',
+      'input',
+      'select',
+      'textarea',
+      'label',
+      '[role="button"]',
+      '[role="slider"]',
+      '[contenteditable="true"]',
+      'ha-slider',
+      'mwc-slider',
+      'paper-slider',
+      'ha-control-slider',
+      'ha-control-circular-slider',
+      'ha-control-select',
+      'ha-control-switch',
+      'ha-icon-button',
+      'mushroom-light-brightness-control',
+      'mushroom-light-color-control',
+      'mushroom-light-color-temp-control',
+      'mushroom-light-controls',
+      'mushroom-input-number',
+    ].join(',');
+
+    const path = ev.composedPath ? ev.composedPath() : [ev.target];
+
+    return path.some((el) => {
+      if (!el || !el.matches) return false;
+      if (el.matches(interactiveSelector)) return true;
+
+      const tag = el.localName || el.tagName?.toLowerCase?.() || '';
+      return tag.includes('slider') || tag.includes('brightness-control') || tag.includes('color-control');
+    });
+  }
+
+  _lockSwipeForControl(scroller) {
+    window.clearTimeout(this._unlockSwipeTimer);
+    scroller.classList.add('ks-swipe-locked');
+  }
+
+  _unlockSwipeForControl(scroller) {
+    window.clearTimeout(this._unlockSwipeTimer);
+    this._unlockSwipeTimer = window.setTimeout(() => {
+      scroller.classList.remove('ks-swipe-locked');
+    }, 120);
   }
 
   async render() {
@@ -133,6 +189,12 @@ class KSSimpleSwipeCard extends HTMLElement {
         -webkit-overflow-scrolling: touch;
         scrollbar-width: none;
         height: ${this.config.height};
+      }
+
+      .ks-scroller.ks-swipe-locked {
+        overflow-x: hidden;
+        scroll-snap-type: none;
+        scroll-behavior: auto;
       }
 
       .ks-scroller::-webkit-scrollbar {
@@ -260,6 +322,27 @@ class KSSimpleSwipeCard extends HTMLElement {
         next.disabled = index >= this.config.cards.length - 1;
       }
     };
+
+    const maybeLockSwipe = (ev) => {
+      if (this._isInteractiveSwipeTarget(ev)) {
+        this._lockSwipeForControl(scroller);
+      }
+    };
+
+    const unlockSwipe = () => this._unlockSwipeForControl(scroller);
+
+    scroller.addEventListener('pointerdown', maybeLockSwipe, { capture: true });
+    scroller.addEventListener('touchstart', maybeLockSwipe, { capture: true, passive: true });
+    scroller.addEventListener('mousedown', maybeLockSwipe, { capture: true });
+    scroller.addEventListener('pointerup', unlockSwipe, { capture: true });
+    scroller.addEventListener('pointercancel', unlockSwipe, { capture: true });
+    scroller.addEventListener('touchend', unlockSwipe, { capture: true, passive: true });
+    scroller.addEventListener('touchcancel', unlockSwipe, { capture: true, passive: true });
+    if (this._globalSwipeUnlock) {
+      window.removeEventListener('mouseup', this._globalSwipeUnlock);
+    }
+    this._globalSwipeUnlock = unlockSwipe;
+    window.addEventListener('mouseup', this._globalSwipeUnlock);
 
     scroller.addEventListener('scroll', () => window.requestAnimationFrame(updateControls));
 
